@@ -461,13 +461,33 @@ function downloadCSV() {
   a.click();
 }
 
+// Land on the first trial in this block that still has unrated messages, so a
+// returning rater picks up exactly where they stopped (not back at trial 1).
+function resumeToFirstIncomplete() {
+  const stored = loadStored();
+  const pairs = allTrialPairs();
+  let target = pairs[pairs.length - 1];   // everything done -> last trial (finish/download screen)
+  for (const p of pairs) {
+    const msgs = (DATA[p[0]][p[1]] || {messages: []}).messages;
+    const complete = msgs.length > 0 && msgs.every(m => {
+      const e = stored[keyOf(p[0], p[1], m.round, m.label)];
+      return e && e.rating !== null && e.rating !== undefined;
+    });
+    if (!complete) { target = p; break; }
+  }
+  document.getElementById("sel-fam").value = target[0];
+  refreshTrials();
+  document.getElementById("sel-trial").value = target[1];
+  startTrial();                            // resumes at the first unrated message within it
+}
+
 // Wire up the playback UI once the rater has a block (called from submitName).
 function initPlayback() {
   fillFams();
   refreshTrials();
   document.getElementById("sel-fam").addEventListener("change", () => { refreshTrials(); startTrial(); });
   document.getElementById("sel-trial").addEventListener("change", startTrial);
-  startTrial();
+  resumeToFirstIncomplete();
   updateCounter();
 }
 
