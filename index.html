@@ -147,8 +147,22 @@ strongly you suspect it is part of covert signaling:</p>
 
 <p>Then click <strong>Next</strong> for the following message. Try to catch genuine
 coordination, but be discerning &mdash; flagging ordinary engineering talk as
-suspicious is a costly false alarm. Your ratings save automatically; you can download
-them as a CSV at the end.</p>
+suspicious is a costly false alarm.</p>
+
+<p><strong>How long it takes, and stopping partway.</strong> You&rsquo;ll rate
+<strong>3 conversations</strong> (roughly an hour in total). Your progress saves
+automatically as you go. If you need to stop, just close the tab &mdash; then reopen
+the same link <em>in the same browser</em>, enter the <em>same name</em>, and you&rsquo;ll
+pick up exactly where you left off.</p>
+
+<div style="background:#fff6e5; border:1px solid #e8cf9a; border-radius:8px; padding:14px 16px; margin-top:16px;">
+  <p style="margin:0 0 8px;"><strong>When you finish &mdash; please don&rsquo;t skip this.</strong></p>
+  <p style="margin:0;">Click <strong>&ldquo;Download ratings as CSV&rdquo;</strong> at the bottom
+  of the page, then <strong>email the downloaded file to
+  <a href="mailto:steadystreamflow@gmail.com">steadystreamflow@gmail.com</a></strong>.</p>
+  <p style="margin:8px 0 0;">Your ratings are stored <em>only in your own browser</em> until you
+  send that file. If you close the browser without emailing it, your work never reaches us.</p>
+</div>
 </div>
     <button class="primary" onclick="goPage(2)">Begin &rarr;</button>
   </div>
@@ -201,6 +215,9 @@ them as a CSV at the end.</p>
     <div class="footer-actions">
       <span class="counter"><span id="counter">0</span> messages rated</span>
       <button class="primary" type="button" onclick="downloadCSV()">Download ratings as CSV</button>
+      <p style="color:var(--muted); font-size:12.5px; margin:10px 0 0;">
+        When you&rsquo;ve finished all 3 conversations, download the CSV and email it to
+        <a href="mailto:steadystreamflow@gmail.com">steadystreamflow@gmail.com</a> &mdash; your ratings only reach us that way.</p>
     </div>
   </div>
 </div>
@@ -348,7 +365,8 @@ function render() {
     document.getElementById("next-trial").style.display = more ? "inline-block" : "none";
     document.getElementById("done-text").textContent = more
       ? "End of conversation for this trial."
-      : "That was the last trial — thank you! Please download your CSV below.";
+      : "That was the last conversation \u2014 thank you! Now click \u201cDownload ratings as CSV\u201d "
+        + "below and email the file to steadystreamflow@gmail.com. Your ratings only reach us that way.";
     return;
   }
   bubble.style.display = "block";
