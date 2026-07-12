@@ -210,7 +210,10 @@ const DATA = {"gpt": {"1": {"src": "initiation_collusion_v2_full3_gpt_w1_gpt-5.1
 const FAM_LABEL = {"claude": "Claude Sonnet 4.6", "gpt": "GPT-5.1", "gemini": "Gemini 2.5 Pro"};
 const BLOCKS = [[["claude", "2"], ["gpt", "5"], ["gemini", "2"]], [["claude", "1"], ["gpt", "1"], ["gemini", "4"]], [["claude", "4"], ["gpt", "4"], ["gemini", "1"]], [["claude", "3"], ["gpt", "3"], ["gemini", "3"]], [["claude", "5"], ["gpt", "2"], ["gemini", "5"]]];
 const N_BLOCKS = 5;
-const RATERS_KEY = "dc_raters";
+// ?test=1 -> a dry run: separate storage, CSV flagged is_test + TEST_ filename,
+// so a test pass can never be mistaken for real data.
+const TEST = new URLSearchParams(location.search).get("test") === "1";
+const RATERS_KEY = TEST ? "dc_test_raters" : "dc_raters";
 
 let rater = null;          // {first, last, id, block} -- set after name entry
 let RATINGS_KEY = null;    // per-rater ratings bucket, set after assignment
@@ -252,9 +255,11 @@ function submitName() {
   reg[nn] = rec;
   localStorage.setItem(RATERS_KEY, JSON.stringify(reg));
   rater = rec;
-  RATINGS_KEY = "dc_ratings_" + rater.id;
+  RATINGS_KEY = (TEST ? "dc_test_ratings_" : "dc_ratings_") + rater.id;
   const badge = document.getElementById("pidbadge");
-  badge.textContent = rater.first + " " + rater.last + " \u00b7 block " + (rater.block + 1);
+  badge.textContent = (TEST ? "TEST MODE \u00b7 " : "")
+    + rater.first + " " + rater.last + " \u00b7 block " + (rater.block + 1);
+  if (TEST) { badge.style.background = "#fdecec"; badge.style.borderColor = "#e0a3a3"; badge.style.color = "#a33"; }
   badge.style.display = "block";
   initPlayback();
   goPage(1);
@@ -432,14 +437,14 @@ function nextTrial() {
 
 function downloadCSV() {
   const d = loadStored();
-  const rows = [["first_name", "last_name", "rater_id", "block", "model", "trial", "src_file",
+  const rows = [["first_name", "last_name", "rater_id", "block", "is_test", "model", "trial", "src_file",
                  "orig_trial_id", "turn", "round", "agent", "rating", "message"]];
   allTrialPairs().forEach(([fam, trial]) => {
     const t0 = DATA[fam][trial];
     t0.messages.forEach((m, t) => {
       const e = d[keyOf(fam, trial, m.round, m.label)];
       if (!e || e.rating === null || e.rating === undefined) return;
-      rows.push([rater.first, rater.last, rater.id, rater.block + 1, fam, trial, t0.src, t0.tid,
+      rows.push([rater.first, rater.last, rater.id, rater.block + 1, TEST, fam, trial, t0.src, t0.tid,
                  t + 1, m.round, m.label, e.rating, (m.message || "").replace(/[\r\n]+/g, " ")]);
     });
   });
@@ -451,7 +456,8 @@ function downloadCSV() {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   const safe = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-  a.download = "detecting_collusion_" + safe(rater.first) + "_" + safe(rater.last) + "_" + rater.id.slice(0, 8) + ".csv";
+  a.download = (TEST ? "TEST_" : "") + "detecting_collusion_" + safe(rater.first) + "_"
+             + safe(rater.last) + "_" + rater.id.slice(0, 8) + ".csv";
   a.click();
 }
 
