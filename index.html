@@ -155,13 +155,14 @@ automatically as you go. If you need to stop, just close the tab &mdash; then re
 the same link <em>in the same browser</em>, enter the <em>same name</em>, and you&rsquo;ll
 pick up exactly where you left off.</p>
 
-<div style="background:#fff6e5; border:1px solid #e8cf9a; border-radius:8px; padding:14px 16px; margin-top:16px;">
-  <p style="margin:0 0 8px;"><strong>When you finish &mdash; please don&rsquo;t skip this.</strong></p>
-  <p style="margin:0;">Click <strong>&ldquo;Download ratings as CSV&rdquo;</strong> at the bottom
-  of the page, then <strong>email the downloaded file to
-  <a href="mailto:pkaushik@fbk.eu">pkaushik@fbk.eu</a></strong>.</p>
-  <p style="margin:8px 0 0;">Your ratings are stored <em>only in your own browser</em> until you
-  send that file. If you close the browser without emailing it, your work never reaches us.</p>
+<div style="background:#eef7ee; border:1px solid #b6d9b6; border-radius:8px; padding:14px 16px; margin-top:16px;">
+  <p style="margin:0 0 8px;"><strong>When you finish.</strong></p>
+  <p style="margin:0;">Your ratings are <strong>saved and submitted automatically</strong> when you
+  reach the end &mdash; you don&rsquo;t need to send anything, and you&rsquo;ll see a
+  &ldquo;submitted&rdquo; confirmation.</p>
+  <p style="margin:8px 0 0;">Only if that confirmation doesn&rsquo;t appear: click
+  <strong>&ldquo;Download ratings as CSV&rdquo;</strong> and email it to
+  <a href="mailto:pkaushik@fbk.eu">pkaushik@fbk.eu</a> as a backup.</p>
 </div>
 </div>
     <button class="primary" onclick="goPage(2)">Begin &rarr;</button>
@@ -210,14 +211,13 @@ pick up exactly where you left off.</p>
     <div id="done" style="display:none">
       <p id="done-text">End of conversation for this trial.</p>
       <button class="primary" id="next-trial" onclick="nextTrial()">Next trial &rarr;</button>
+      <p id="submit-status" style="margin-top:10px; font-size:14px; color:var(--accent);"></p>
     </div>
 
     <div class="footer-actions">
       <span class="counter"><span id="counter">0</span> messages rated</span>
       <button class="primary" type="button" onclick="downloadCSV()">Download ratings as CSV</button>
-      <p style="color:var(--muted); font-size:12.5px; margin:10px 0 0;">
-        When you&rsquo;ve finished both conversations, download the CSV and email it to
-        <a href="mailto:pkaushik@fbk.eu">pkaushik@fbk.eu</a> &mdash; your ratings only reach us that way.</p>
+      <p style="color:var(--muted); font-size:12.5px; margin:10px 0 0;">Your ratings submit automatically when you finish &mdash; this download is just an optional backup you can email to <a href="mailto:pkaushik@fbk.eu">pkaushik@fbk.eu</a>.</p>
     </div>
   </div>
 </div>
@@ -231,6 +231,7 @@ const N_BLOCKS = 5;
 // so a test pass can never be mistaken for real data.
 const TEST = new URLSearchParams(location.search).get("test") === "1";
 const RATERS_KEY = TEST ? "dc_test_raters" : "dc_raters";
+const SUBMIT_URL = "https://script.google.com/macros/s/AKfycbzjvOHd3N7N-1Te3vLvFLSJCC-2E2EhQ8W8nl8JKWpkVM56rGKBXmaAlyl9k4Lvi9Cubg/exec";   // Apps Script endpoint; "" -> download-only
 
 let rater = null;          // {first, last, id, block} -- set after name entry
 let RATINGS_KEY = null;    // per-rater ratings bucket, set after assignment
@@ -365,8 +366,11 @@ function render() {
     document.getElementById("next-trial").style.display = more ? "inline-block" : "none";
     document.getElementById("done-text").textContent = more
       ? "End of conversation for this trial."
-      : "That was the last conversation \u2014 thank you! Now click \u201cDownload ratings as CSV\u201d "
-        + "below and email the file to pkaushik@fbk.eu. Your ratings only reach us that way.";
+      : (SUBMIT_URL
+          ? "That was the last conversation \u2014 thank you! Submitting your ratings now\u2026"
+          : "That was the last conversation \u2014 thank you! Now click \u201cDownload ratings as CSV\u201d "
+            + "below and email the file to pkaushik@fbk.eu. Your ratings only reach us that way.");
+    if (!more) submitRatings(true);   // auto-submit on completion (no-op if SUBMIT_URL unset)
     return;
   }
   bubble.style.display = "block";
@@ -452,6 +456,40 @@ function nextTrial() {
   startTrial();
   window.scrollTo(0, 0);
 }
+
+function submitRatings(auto) {
+  if (!SUBMIT_URL || !rater) return;                  // not configured -> download only
+  const flagKey = "dc_submitted_" + rater.id;
+  if (auto && localStorage.getItem(flagKey)) return;  // don't auto-resend on revisit
+  const d = loadStored();
+  const ts = new Date().toISOString();
+  const rows = [];
+  allTrialPairs().forEach(([fam, trial]) => {
+    const t0 = DATA[fam][trial];
+    t0.messages.forEach((m, t) => {
+      const e = d[keyOf(fam, trial, m.round, m.label)];
+      if (!e || e.rating === null || e.rating === undefined) return;
+      rows.push([ts, rater.first, rater.last, rater.id, rater.block + 1, TEST,
+                 fam, trial, t0.src, t0.tid, t + 1, m.round, m.label, e.rating]);
+    });
+  });
+  if (!rows.length) return;
+  const status = document.getElementById("submit-status");
+  if (status) status.textContent = "Submitting your ratings\u2026";
+  // text/plain body + no-cors: a "simple" request that reaches Apps Script without a
+  // CORS preflight (which Apps Script can't answer). The response is opaque, so we
+  // treat it as sent and keep the CSV download as the backup of record.
+  fetch(SUBMIT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify({rows: rows}) })
+    .then(() => {
+      localStorage.setItem(flagKey, "1");
+      if (status) status.textContent = "\u2713 Your ratings were submitted \u2014 thank you!";
+    })
+    .catch(() => {
+      if (status) status.textContent = "Couldn\u2019t auto-submit \u2014 please click "
+        + "\u201cDownload ratings as CSV\u201d below and email it to pkaushik@fbk.eu.";
+    });
+}
+
 
 function downloadCSV() {
   const d = loadStored();
